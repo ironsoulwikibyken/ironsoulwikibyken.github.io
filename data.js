@@ -29,7 +29,7 @@ const DATA = {
     name: "IronSoulWIKI",
     tagline: "Buat game lu jadi Makin gampang",
     game: "Iron Soul", // placeholder Roblox game name
-    stats: { articles: 12, weekly_visitors: "10", codes: 5, contributors: 100 }
+    stats: { articles: 4, weekly_visitors: "N/A", codes: 5, contributors: 1 }
   },
 
   /* ======================== GUIDES ======================== */
@@ -147,14 +147,14 @@ const DATA = {
   ore: [
     {
       slug: "iron-ore",
-      name: "Kenki Ore",
-      image: "images/Kenki-ore.jpg",
-      description: "The most common ore in the Frontier, found near the surface of almost every biome.",
-      rarity: "Mytical",
+      name: "Kenki",
+      image: "Images/Kenki-ore.jpg",
+      description: "Bisa lu dapetin di mode nighmare tartarus,dan bisa lebih gampang di dapetin kalau lu maen di mode Hell.",
+      rarity: "Mythical",
       spawn: "Copper Flats",
       dropRate: "30%",
       sellPrice: "12 Gold",
-      requiredLevel: 89,
+      requiredLevel: 83,
       usedFor: ["Mytic Equipment"],
       recipes: [{ item: "Starter Tool", materials: "3x Kenki Ore" }],
       tips: "Easy to find in Hell Tartarus.",
@@ -162,13 +162,13 @@ const DATA = {
     },
     {
       slug: "copper-ore",
-      name: "Lionite Ore",
-      image: "images/Lionite-ore.jpg",
-      description: "So Hard to get this ore cause this ore the best ore in this game.",
-      rarity: "High Mytical Hell",
-      spawn: "Hell Tartarus Nightmare",
+      name: "Lionite",
+      image: "Images/Lionite-ore.jpg",
+      description: "Ore paling terbaik untuk saat ini di iron soul,dan bisa lu dapetin ore di di mode hell penitent,tapi kalau mau lebih cepat bisa di mode Nigtmare.",
+      rarity: "High Mythical",
+      spawn: "Hell Tartarus",
       dropRate: "10%",
-      sellPrice: "260 Gold",
+      sellPrice: "18 Gold",
       requiredLevel: 90,
       usedFor: ["Lionite Core"],
       recipes: [{ item: "Lionite Core", materials: "3x Lionite Ore" }],
@@ -176,19 +176,49 @@ const DATA = {
       related: ["iron-ore", "silver-ore"]
     },
     {
+      slug: "dark-blossom-ore",
+      name: "Dark Blossom",
+      image: "Images",
+      description: "Dark blossom ore mythical terendah untuk di dungeon tartarus,dan lu bisa dapetin ini di mode penitent tanpa hell.",
+      rarity: "Mythical",
+      spawn: "Hell Tartarus Nightmare",
+      dropRate: "80%",
+      sellPrice: "18 Gold",
+      requiredLevel: 73,
+      usedFor: ["Darkblossom core"],
+      recipes: [{ item: "Darkblossom Core", materials: "3x Dark Blossom Ore" }],
+      tips: "Just Spam Dungeons.",
+      related: ["iron-ore", "silver-ore"]
+    },
+    {
+      slug: "apocalypse-ore",
+      name: "Apocalypse",
+      image: "Images/Apocalypse.jpg",
+      description: "Batu ini di bawah satu tingkat dari Kenki,dan bisa lu dapetin di dungeon torment tanpa harus main mode hell .",
+      rarity: "Mythical",
+      spawn: "Torment Dungeon",
+      dropRate: "60%",
+      sellPrice: "18 Gold",
+      requiredLevel: 76,
+      usedFor: ["Apocalypse Core"],
+      recipes: [{ item: "Apocalypse Core", materials: "3x Apocalypse Ore" }],
+      tips: "Just Spam Dungeons.",
+      related: ["iron-ore", "silver-ore"]
+    },
+    {
       slug: "silver-ore",
-      name: "Lotus Ore",
-      image: "images/Lotus-ore.jpg",
-      description: "A mid-tier rare ore with elemental energy.",
-      rarity: "rare",
-      spawn: "Frostpeak Ridge",
-      dropRate: "44%",
+      name: "Roten Lotus",
+      image: "Images/Lotus-ore.jpg",
+      description: "Salah satu ore terbaik sebelum lionite muncul,bisa di cari di mode hell nightmare Oatlost,tapi lebih baik di cari di map tartarus .",
+      rarity: "High Mythical",
+      spawn: "Oatlost and Tartarus",
+      dropRate: "50%",
       sellPrice: "35 Gold",
-      requiredLevel: 10,
+      requiredLevel: 64,
       usedFor: ["Lotus Blade"],
-      recipes: [{ item: "Lotus Blade", materials: "10x Lotus Ore" }],
+      recipes: [{ item: "Lotus Blade", materials: "3x Lotus Ore" }],
       tips: "Requires a better pickaxe to mine.",
-      related: ["iron-ore", "gold-ore"]
+      related: ["iron-ore", "copper-ore"]
     }
   ],
 
@@ -255,7 +285,7 @@ const DATA = {
         pros: ["Strong crowd control", "Great range", "Excellent in group dungeons"],
         cons: ["Low crit chance", "Squishy caster with no defensive passive"],
         bestBuild: "Pair with a Heavy Weapon user's Molten Core passive for a permanent freeze/burn lock.",
-        related: ["emberheart-rod", "wisp-cane"]
+        related: ["wisp-cane"]
       },
       {
         slug: "wisp-cane",
@@ -272,7 +302,7 @@ const DATA = {
         pros: ["Cheap early staff option", "Decent range for its tier"],
         cons: ["Damage falls off quickly past level 20"],
         bestBuild: "Great starter caster weapon while farming toward the Frostbind Staff materials.",
-        related: ["frostbind-staff", "emberheart-rod"]
+        related: ["frostbind-staff"]
       }
     ],
     "heavy-weapon": [
@@ -327,14 +357,14 @@ const DATA = {
         pros: ["Fastest attack speed in the game", "Excellent single-target DPS combo"],
         cons: ["Very short range, high risk melee", "Combo resets if you get interrupted"],
         bestBuild: "Best for players comfortable dodge-weaving boss telegraphs at close range.",
-        related: ["twin-fangs", "gravefist-wraps"]
+        related: ["twin-fangs", "windcutter-dagger"]
       }
     ],
     "scythe": [
       {
         slug: "voidreaper-scythe",
         name: "Voidreaper Scythe",
-        image: "images",
+        image: "https://images.unsplash.com/photo-1601987177651-8edfe6c20009?q=80&w=1200&auto=format&fit=crop",
         rarity: "mythical",
         damage: 132, speed: 46, range: 40, critChance: 20,
         element: "Void",
@@ -353,7 +383,7 @@ const DATA = {
       {
         slug: "stormcaller-bow",
         name: "Stormcaller Bow",
-        image: "images",
+        image: "https://images.unsplash.com/photo-1584467541268-b040f83be3fd?q=80&w=1200&auto=format&fit=crop",
         rarity: "epic",
         damage: 95, speed: 60, range: 100, critChance: 22,
         element: "Lightning",
@@ -370,7 +400,7 @@ const DATA = {
       {
         slug: "hunters-longbow",
         name: "Hunter's Longbow",
-        image: "images",
+        image: "https://images.unsplash.com/photo-1516900557549-41557d405adf?q=80&w=1200&auto=format&fit=crop",
         rarity: "uncommon",
         damage: 58, speed: 65, range: 90, critChance: 18,
         element: "Physical",
@@ -392,7 +422,7 @@ const DATA = {
     {
       slug: "sunken-quarry",
       name: "Sunken Quarry",
-      banner: "images",
+      banner: "https://images.unsplash.com/photo-1520962880247-cfaf541c8724?q=80&w=1400&auto=format&fit=crop",
       level: "8 – 16",
       difficulty: "easy",
       boss: "Rockback Golem",
@@ -403,15 +433,15 @@ const DATA = {
       drops: [{ item: "Silver Ore", chance: "100%" }, { item: "Gold Ore", chance: "18%" }, { item: "Quarry Vest (cosmetic)", chance: "4%" }],
       tips: "The Rockback Golem telegraphs its slam attack with a red glow — dodge left, not back, to avoid the follow-up shockwave.",
       gallery: [
-        "images",
-        "images",
-        "images"
+        "https://images.unsplash.com/photo-1533587851505-d119e13fa0d7?q=80&w=800&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1500534623283-312aade485b7?q=80&w=800&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1521295121783-8a321d551ad2?q=80&w=800&auto=format&fit=crop"
       ]
     },
     {
       slug: "frostpeak-ridge",
       name: "Frostpeak Ridge",
-      banner: "images",
+      banner: "https://images.unsplash.com/photo-1483347756197-71ef80e95f73?q=80&w=1400&auto=format&fit=crop",
       level: "18 – 30",
       difficulty: "medium",
       boss: "Glacierwing Drake",
@@ -451,11 +481,11 @@ const DATA = {
   /* ======================== REDEEM CODES ======================== */
   codes: {
     active: [
-      { code: "IRONSOULWEEKEND18", reward: "Check it yourself—don't be lazy.", expires: "Don't know" },
-      { code: "SEASON2ENDING", reward: "Check it yourself—don't be lazy.", expires: "Don't know" },
-      { code: "SCYTHEWEAPON", reward: "Check it yourself—don't be lazy.", expires: "Don't know" },
-      { code: "IRONSOULWEEKEND17", reward: "Check it yourself—don't be lazy.", expires: "Don't know" },
-      { code: "NEWMAP ", reward: "Check it yourself—don't be lazy.", expires: "Don't know" },
+      { code: "IRONSOULWEEKEND18", reward: "Reward not verified", expires: "Unknown" },
+      { code: "SEASON2ENDING", reward: "Reward not verified", expires: "Unknown" },
+      { code: "SCYTHEWEAPON", reward: "Reward not verified", expires: "Unknown" },
+      { code: "IRONSOULWEEKEND17", reward: "Reward not verified", expires: "Unknown" },
+      { code: "NEWMAP", reward: "Reward not verified", expires: "Unknown" },
     ],
     expired: [
       { code: "LAUNCHWEEK", reward: "1,000 Gold", expires: "2026-06-10" },
@@ -468,7 +498,7 @@ const DATA = {
   news: [
     {
       slug: "update-patch-preview",
-      title: "Update Patch 10.5 ✨️",
+      title: "Update Patch Preview",
       category: "Update Patch",
       cover: "Images/update10.6.jpg",
       excerpt: "New Weapon Type - Scythe, Tartarus Hell Mode Update, Glory Store, and more!",
@@ -491,7 +521,7 @@ const DATA = {
 • Season II selesai dalam 7 hari!`
     },
     {
-      slug: "New Update",
+      slug: "new-update",
       title: "Update 10.6 Notes: NEW UPDATE",
       category: "Patch Notes",
       cover: "Images/update10.6.jpg",
