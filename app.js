@@ -1037,9 +1037,10 @@ function initChrome(){
   window.addEventListener('hashchange', navigate);
   navigate();
 
-  // Initialize Supabase Realtime & Test Control Widget
-  initSupabaseRealtime();
+  // Render widget FIRST so DOM elements exist before status callbacks fire
   renderRealtimeControlWidget();
+  // Then init Supabase Realtime
+  initSupabaseRealtime();
 }
 
 /* ============================================================
@@ -1057,32 +1058,49 @@ let currentStats = {
 };
 
 function initSupabaseRealtime() {
-  if (typeof window.supabase === 'undefined') return;
+  if (typeof window.supabase === 'undefined') {
+    console.warn('[Realtime] Supabase SDK not found.');
+    return;
+  }
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  console.log('[Realtime] Supabase client created.');
 
-  // Fetch initial stats from Supabase
+  // Fetch initial stats from Supabase and force-update DOM
   supabaseClient
     .from('site_stats')
     .select('*')
     .eq('id', 'main')
     .single()
     .then(({ data, error }) => {
-      if (!error && data) {
-        updateStatsFromPayload(data, false);
+      if (error) {
+        console.error('[Realtime] Initial fetch error:', error.message);
+        return;
+      }
+      if (data) {
+        console.log('[Realtime] Initial data loaded:', data);
+        updateStatsFromPayload(data, false, true); // force=true: always update DOM
       }
     });
 
-  // Subscribe to Realtime channel
-  supabaseClient
-    .channel('public:site_stats')
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'site_stats' }, payload => {
-      if (payload.new) {
-        updateStatsFromPayload(payload.new, true);
+  // Subscribe to Realtime postgres_changes
+  const channel = supabaseClient
+    .channel('realtime-site-stats')
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'site_stats' },
+      payload => {
+        console.log('[Realtime] UPDATE received:', payload.new);
+        if (payload.new) {
+          updateStatsFromPayload(payload.new, true, true);
+        }
       }
-    })
+    )
     .subscribe(status => {
+      console.log('[Realtime] Channel status:', status);
       updateRealtimeStatusIndicator(status);
     });
+
+  console.log('[Realtime] Subscribed to channel:', channel);
 }
 
 function updateRealtimeStatusIndicator(status) {
@@ -1108,7 +1126,7 @@ function updateRealtimeStatusIndicator(status) {
   }
 }
 
-function updateStatsFromPayload(data, animate = true) {
+function updateStatsFromPayload(data, animate = true, force = false) {
   if (data.articles !== undefined) currentStats.articles = data.articles;
   if (data.weekly_readers !== undefined) currentStats.weekly_readers = data.weekly_readers;
   if (data.active_codes !== undefined) currentStats.active_codes = data.active_codes;
@@ -1119,11 +1137,11 @@ function updateStatsFromPayload(data, animate = true) {
   DATA.site.stats.codes = currentStats.active_codes;
   DATA.site.stats.contributors = currentStats.contributors;
 
-  updateHeroStatsDOM(animate);
+  updateHeroStatsDOM(animate, force);
   updateControlPanelValues();
 }
 
-function updateHeroStatsDOM(animate = true) {
+function updateHeroStatsDOM(animate = true, force = false) {
   const map = {
     'stat-articles': currentStats.articles,
     'stat-weekly-readers': currentStats.weekly_readers,
@@ -1134,9 +1152,10 @@ function updateHeroStatsDOM(animate = true) {
   Object.entries(map).forEach(([id, val]) => {
     const el = document.getElementById(id);
     if (el) {
-      if (el.textContent !== String(val)) {
+      const changed = el.textContent !== String(val);
+      if (changed || force) {
         el.textContent = val;
-        if (animate) {
+        if (animate && changed) {
           el.classList.remove('stat-updated');
           void el.offsetWidth;
           el.classList.add('stat-updated');
