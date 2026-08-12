@@ -178,7 +178,7 @@ const DATA = {
     {
       slug: "dark-blossom-ore",
       name: "Dark Blossom",
-      image: "Images",
+      image: "Images/Lotus-ore.jpg",
       description: "Dark blossom ore mythical terendah untuk di dungeon tartarus,dan lu bisa dapetin ini di mode penitent tanpa hell.",
       rarity: "Mythical",
       spawn: "Hell Tartarus Nightmare",
