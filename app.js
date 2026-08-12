@@ -58,6 +58,8 @@ function rarityBadge(r){
   return `<span class="badge ${map[r]||'badge-gray'}">${r}</span>`;
 }
 function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+function escapeHTML(value){ return String(value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]); }
+function renderMarkdown(text){ return escapeHTML(text).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>'); }
 
 const BOOKMARK_KEY = 'gamewiki_bookmarks';
 function getBookmarks(){ try{ return JSON.parse(localStorage.getItem(BOOKMARK_KEY))||[]; }catch(e){ return []; } }
@@ -71,24 +73,29 @@ function isBookmarked(id){ return getBookmarks().includes(id); }
 
 function toast(msg){
   const el = $('#toast');
-  el.innerHTML = icon('check') + `<span>${msg}</span>`;
+  el.innerHTML = icon('check') + `<span>${escapeHTML(msg)}</span>`;
   el.classList.add('show');
   clearTimeout(window.__toastT);
   window.__toastT = setTimeout(()=>el.classList.remove('show'), 2200);
 }
 
-function copyCode(code, btn){
-  navigator.clipboard?.writeText(code).catch(()=>{});
+async function copyCode(code, btn){
+  try { await navigator.clipboard.writeText(code); }
+  catch { toast('Clipboard access unavailable'); return; }
   btn.classList.add('copied');
   btn.innerHTML = icon('check') + 'Copied!';
   toast(`Code "${code}" copied to clipboard`);
   setTimeout(()=>{ btn.classList.remove('copied'); btn.innerHTML = icon('copy') + 'Copy'; }, 1800);
 }
 
-function shareCurrent(title){
+async function shareCurrent(title){
   const url = location.href;
-  if(navigator.share){ navigator.share({ title, url }).catch(()=>{}); }
-  else{ navigator.clipboard?.writeText(url); toast('Link copied to clipboard'); }
+  if(navigator.share){
+    try { await navigator.share({ title, url }); } catch {}
+    return;
+  }
+  try { await navigator.clipboard.writeText(url); toast('Link copied to clipboard'); }
+  catch { toast('Clipboard access unavailable'); }
 }
 
 /* ---------------------------- Search index ---------------------------- */
@@ -116,7 +123,7 @@ function renderSearchPanel(query){
   const panel = $('#search-panel');
   const results = runSearch(query);
   if(!query.trim()){ panel.innerHTML = `<div class="sp-empty">Start typing to search guides, weapons, ore, dungeons, codes &amp; news…</div>`; return; }
-  if(!results.length){ panel.innerHTML = `<div class="sp-empty">No results for "${query}"</div>`; return; }
+  if(!results.length){ panel.innerHTML = `<div class="sp-empty">No results for "${escapeHTML(query)}"</div>`; return; }
   const groups = {};
   results.forEach(r => { (groups[r.type] = groups[r.type]||[]).push(r); });
   panel.innerHTML = Object.entries(groups).map(([type, items]) => `
@@ -141,7 +148,11 @@ function matchRoute(hash){
     const m = hash.match(rx);
     if(m){
       const params = {};
-      keys.forEach((k,i) => params[k] = decodeURIComponent(m[i+1]));
+      try {
+        keys.forEach((k,i) => params[k] = decodeURIComponent(m[i+1]));
+      } catch {
+        return null;
+      }
       return { handler: r.handler, params };
     }
   }
@@ -149,10 +160,13 @@ function matchRoute(hash){
 }
 
 let currentScrollHandler = null;
+let navigationId = 0;
 
 async function navigate(){
+  const thisNavigation = ++navigationId;
   const hash = (location.hash || '#/').replace(/^#/, '') || '/';
-  const match = matchRoute(hash);
+  const path = hash.split('?')[0] || '/';
+  const match = matchRoute(path);
   const app = $('#app');
 
   // route loading bar
@@ -165,6 +179,7 @@ async function navigate(){
   window.scrollTo({ top:0, behavior:'instant' in document.documentElement.style ? 'instant':'auto' });
 
   await new Promise(res => setTimeout(res, 260));
+  if(thisNavigation !== navigationId) return;
 
   if(match){
     app.innerHTML = match.handler(match.params) || notFoundView();
@@ -175,8 +190,8 @@ async function navigate(){
   loader.style.width = '100%';
   setTimeout(()=>{ loader.classList.remove('active'); loader.style.width='0%'; }, 260);
 
-  setActiveNav(hash);
-  initPageWidgets(hash);
+  setActiveNav(path);
+  initPageWidgets(path);
   window.scrollTo(0,0);
 }
 
@@ -305,10 +320,10 @@ route('/', () => {
         <button class="btn btn-primary btn-sm" id="hero-search-btn">Search</button>
       </div>
       <div class="hero-stats">
-        <div class="hero-stat"><b>${s.stats.articles}</b><span>Articles</span></div>
-        <div class="hero-stat"><b>${s.stats.weekly_visitors}</b><span>Weekly Readers</span></div>
-        <div class="hero-stat"><b>${s.stats.codes}</b><span>Active Codes</span></div>
-        <div class="hero-stat"><b>${s.stats.contributors}</b><span>Contributors</span></div>
+        <div class="hero-stat"><b id="stat-articles">${s.stats.articles}</b><span>Articles</span></div>
+        <div class="hero-stat"><b id="stat-weekly-readers">${s.stats.weekly_visitors}</b><span>Weekly Readers</span></div>
+        <div class="hero-stat"><b id="stat-codes">${s.stats.codes}</b><span>Active Codes</span></div>
+        <div class="hero-stat"><b id="stat-contributors">${s.stats.contributors}</b><span>Contributors</span></div>
       </div>
     </div>
   </section>
@@ -375,7 +390,7 @@ route('/', () => {
         <div class="stagger" style="display:flex;flex-direction:column;gap:12px;">
           ${codes.map(c=>`<div class="code-card">
             <div class="code-left"><span class="code-chip mono">${c.code}</span><div><div class="code-reward">${c.reward}</div><div class="code-exp">Expires ${c.expires}</div></div></div>
-            <button class="copy-btn" onclick="copyCode('${c.code}', this)">${icon('copy')}Copy</button>
+            <button class="copy-btn" data-copy-code="${escapeHTML(c.code)}">${icon('copy')}Copy</button>
           </div>`).join('')}
         </div>
       </div>
@@ -391,8 +406,8 @@ route('/guides', () => {
   <div class="wrap section" style="padding-top:8px;">
     <div class="section-head"><div><span class="kicker">${DATA.guides.length} articles</span><h2>All Guides</h2><p>Learn every system in the game, from your first pickaxe swing to end-game builds.</p></div></div>
     <div class="filter-bar" id="guide-filters">
-      <span class="tag active" data-filter="all">All</span>
-      ${[...new Set(DATA.guides.map(g=>g.category))].map(c=>`<span class="tag" data-filter="${c}">${c}</span>`).join('')}
+      <button class="tag active" data-filter="all">All</button>
+      ${[...new Set(DATA.guides.map(g=>g.category))].map(c=>`<button class="tag" data-filter="${c}">${c}</button>`).join('')}
     </div>
     <div class="grid grid-4 stagger" id="guides-grid">${DATA.guides.map(guideCard).join('')}</div>
   </div>`;
@@ -419,7 +434,7 @@ route('/guides/:slug', ({slug}) => {
           <div class="card-meta">${icon('clock')} ${g.readTime} · Updated ${fmtDate(g.updated)}</div>
           <div style="flex:1;"></div>
           <button class="icon-btn ${isBookmarked(bmId)?'active':''}" id="bookmark-btn" data-id="${bmId}" title="Bookmark">${icon(isBookmarked(bmId)?'bookmarkFilled':'bookmark')}</button>
-          <button class="icon-btn" onclick="shareCurrent('${g.title.replace(/'/g,"")}')" title="Share">${icon('share')}</button>
+          <button class="icon-btn" data-share-title="${escapeHTML(g.title)}" title="Share">${icon('share')}</button>
         </div>
 
         <p class="prose" style="font-size:16px;">${g.description}</p>
@@ -432,20 +447,12 @@ route('/guides/:slug', ({slug}) => {
           ${g.body.map(b => `${b.h?`<h2 id="${b.h}">${b.title}</h2>`:''}<p>${b.p}</p>`).join('')}
         </article>
 
-        <div class="panel" style="margin-top:36px;">
-          <h3>${icon('news')} Comments</h3>
-          <p style="color:var(--text-faint);font-size:13.5px;margin-bottom:14px;">Comments are a placeholder in this template — hook up your preferred comment system (Disqus, Giscus, custom backend) here.</p>
-          <div style="display:flex;gap:10px;">
-            <input class="filter-input" style="flex:1;" placeholder="Add a comment… (placeholder, non-functional)" disabled>
-            <button class="btn btn-ghost btn-sm" disabled>Post</button>
-          </div>
-        </div>
       </div>
 
       <aside>
         <div class="panel">
           <h3>${icon('book')} Table of Contents</h3>
-          <div class="toc" id="toc">${g.toc.map(t=>`<a href="#${t.id}">${t.label}</a>`).join('')}</div>
+          <div class="toc" id="toc">${g.toc.map(t=>`<button type="button" data-target="${escapeHTML(t.id)}">${t.label}</button>`).join('')}</div>
         </div>
         <div class="panel">
           <h3>${icon('compass')} Related Guides</h3>
@@ -474,8 +481,6 @@ route('/items', () => {
     </div>
   </div>`;
 });
-
-function orePageSize(){ return 6; }
 
 route('/items/ore', () => {
   return breadcrumb([{label:'Items',url:'#/items'},{label:'Ore'}]) + `
@@ -549,7 +554,7 @@ route('/items/ore/:slug', ({slug}) => {
         <div class="panel">
           <div class="action-row">
             <button class="icon-btn ${isBookmarked(bmId)?'active':''}" id="bookmark-btn" data-id="${bmId}" title="Bookmark">${icon(isBookmarked(bmId)?'bookmarkFilled':'bookmark')}</button>
-            <button class="icon-btn" onclick="shareCurrent('${o.name}')" title="Share">${icon('share')}</button>
+            <button class="icon-btn" data-share-title="${escapeHTML(o.name)}" title="Share">${icon('share')}</button>
           </div>
         </div>
       </aside>
@@ -582,8 +587,8 @@ route('/crafting/:cat', ({cat}) => {
   <div class="wrap section" style="padding-top:8px;">
     <div class="section-head"><div><span class="kicker">${list.length} weapons</span><h2>${catDef.label}</h2></div></div>
     <div class="filter-bar">
-      <span class="tag active" data-filter="all">All Rarities</span>
-      ${[...new Set(list.map(w=>w.rarity))].map(r=>`<span class="tag" data-filter="${r}">${slugTitle(r)}</span>`).join('')}
+      <button class="tag active" data-filter="all">All Rarities</button>
+      ${[...new Set(list.map(w=>w.rarity))].map(r=>`<button class="tag" data-filter="${r}">${slugTitle(r)}</button>`).join('')}
     </div>
     <div class="grid grid-4 stagger" id="weapon-grid">${list.map(w=>weaponCard(w,cat)).join('')}</div>
   </div>`;
@@ -660,7 +665,7 @@ route('/crafting/:cat/:slug', ({cat,slug}) => {
         <div class="panel">
           <div class="action-row">
             <button class="icon-btn ${isBookmarked(bmId)?'active':''}" id="bookmark-btn" data-id="${bmId}" title="Bookmark">${icon(isBookmarked(bmId)?'bookmarkFilled':'bookmark')}</button>
-            <button class="icon-btn" onclick="shareCurrent('${w.name}')" title="Share">${icon('share')}</button>
+            <button class="icon-btn" data-share-title="${escapeHTML(w.name)}" title="Share">${icon('share')}</button>
           </div>
         </div>
       </aside>
@@ -676,8 +681,8 @@ route('/dungeons', () => {
   <div class="wrap section" style="padding-top:8px;">
     <div class="section-head"><div><span class="kicker">${DATA.dungeons.length} dungeons</span><h2>Dungeons</h2><p>Boss strategies, drop tables and recommended gear for every dungeon.</p></div></div>
     <div class="filter-bar">
-      <span class="tag active" data-filter="all">All Difficulties</span>
-      ${[...new Set(DATA.dungeons.map(d=>d.difficulty))].map(d=>`<span class="tag" data-filter="${d}">${slugTitle(d)}</span>`).join('')}
+      <button class="tag active" data-filter="all">All Difficulties</button>
+      ${[...new Set(DATA.dungeons.map(d=>d.difficulty))].map(d=>`<button class="tag" data-filter="${d}">${slugTitle(d)}</button>`).join('')}
     </div>
     <div class="grid grid-3 stagger" id="dungeon-grid">${DATA.dungeons.map(dungeonCard).join('')}</div>
   </div>`;
@@ -701,7 +706,7 @@ route('/dungeons/:slug', ({slug}) => {
         <div class="action-row" style="margin:20px 0;">
           <div class="card-meta">${icon('shield')} Boss: ${d.boss}</div><div style="flex:1;"></div>
           <button class="icon-btn ${isBookmarked(bmId)?'active':''}" id="bookmark-btn" data-id="${bmId}" title="Bookmark">${icon(isBookmarked(bmId)?'bookmarkFilled':'bookmark')}</button>
-          <button class="icon-btn" onclick="shareCurrent('${d.name}')" title="Share">${icon('share')}</button>
+          <button class="icon-btn" data-share-title="${escapeHTML(d.name)}" title="Share">${icon('share')}</button>
         </div>
 
         <div class="panel">
@@ -764,7 +769,7 @@ route('/codes', () => {
     <div id="active-codes" style="display:flex;flex-direction:column;gap:12px;" class="stagger">
       ${DATA.codes.active.map(c=>`<div class="code-card" data-code="${c.code.toLowerCase()}">
         <div class="code-left"><span class="code-chip mono">${c.code}</span><div><div class="code-reward">${c.reward}</div><div class="code-exp">Expires ${c.expires}</div></div></div>
-        <button class="copy-btn" onclick="copyCode('${c.code}', this)">${icon('copy')}Copy</button>
+        <button class="copy-btn" data-copy-code="${escapeHTML(c.code)}">${icon('copy')}Copy</button>
       </div>`).join('')}
     </div>
 
@@ -787,8 +792,8 @@ route('/news', () => {
   <div class="wrap section" style="padding-top:8px;">
     <div class="section-head"><div><span class="kicker">${DATA.news.length} posts</span><h2>News</h2><p>Patch notes, new weapons, new crafting recipes, event announcements and upcoming updates.</p></div></div>
     <div class="filter-bar" id="news-filters">
-      <span class="tag active" data-filter="all">All</span>
-      ${cats.map(c=>`<span class="tag" data-filter="${c}">${c}</span>`).join('')}
+      <button class="tag active" data-filter="all">All</button>
+      ${cats.map(c=>`<button class="tag" data-filter="${c}">${c}</button>`).join('')}
     </div>
     <div class="grid grid-3 stagger" id="news-grid">${[...DATA.news].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(newsCard).join('')}</div>
   </div>`;
@@ -813,9 +818,9 @@ route('/news/:slug', ({slug}) => {
         <div class="action-row" style="margin:20px 0;">
           <div class="card-meta">${icon('clock')} ${fmtDate(n.date)}</div><div style="flex:1;"></div>
           <button class="icon-btn ${isBookmarked(bmId)?'active':''}" id="bookmark-btn" data-id="${bmId}" title="Bookmark">${icon(isBookmarked(bmId)?'bookmarkFilled':'bookmark')}</button>
-          <button class="icon-btn" onclick="shareCurrent('${n.title.replace(/'/g,"")}')" title="Share">${icon('share')}</button>
+          <button class="icon-btn" data-share-title="${escapeHTML(n.title)}" title="Share">${icon('share')}</button>
         </div>
-        <article class="prose" id="article-body"><p>${n.body}</p></article>
+        <article class="prose" id="article-body"><p>${renderMarkdown(n.body)}</p></article>
       </div>
       <aside>
         <div class="panel">
@@ -838,7 +843,7 @@ route('/search', () => {
   const results = runSearch(q);
   return breadcrumb([{label:'Search'}]) + `
   <div class="wrap section" style="padding-top:8px;">
-    <div class="section-head"><div><span class="kicker">${results.length} results</span><h2>Search results for "${q}"</h2></div></div>
+    <div class="section-head"><div><span class="kicker">${results.length} results</span><h2>Search results for "${escapeHTML(q)}"</h2></div></div>
     ${results.length ? `<div class="grid grid-3 stagger">${results.map(r=>`
       <a href="${r.url}" class="card"><div class="card-media">${r.img?`<img src="${r.img}" loading="lazy" alt="">`:''}<span class="pos-badge badge badge-blue">${r.type}</span></div>
       <div class="card-body"><div class="card-title">${r.title}</div><div class="card-desc">${r.sub}</div></div></a>`).join('')}</div>`
@@ -850,6 +855,9 @@ route('/search', () => {
    PAGE WIDGET INITIALIZATION (runs after every render)
    ============================================================ */
 function initPageWidgets(hash){
+  $$('[data-copy-code]').forEach(btn => btn.addEventListener('click', () => copyCode(btn.dataset.copyCode, btn)));
+  $$('[data-share-title]').forEach(btn => btn.addEventListener('click', () => shareCurrent(btn.dataset.shareTitle)));
+
   // Bookmark button
   const bmBtn = $('#bookmark-btn');
   if(bmBtn){
@@ -939,15 +947,18 @@ function initPageWidgets(hash){
   }
 
   // TOC scroll-spy
+  if(window.__tocScrollHandler) window.removeEventListener('scroll', window.__tocScrollHandler);
   const toc = $('#toc');
   if(toc){
-    const links = $$('a', toc);
-    const targets = links.map(l => document.getElementById(l.getAttribute('href').slice(1))).filter(Boolean);
+    const links = $$('button', toc);
+    const targets = links.map(l => document.getElementById(l.dataset.target)).filter(Boolean);
+    links.forEach(link => link.addEventListener('click', () => document.getElementById(link.dataset.target)?.scrollIntoView()));
     const spy = () => {
       let activeIdx = 0;
       targets.forEach((t,i) => { if(t.getBoundingClientRect().top < 140) activeIdx = i; });
       links.forEach((l,i) => l.classList.toggle('active', i===activeIdx));
     };
+    window.__tocScrollHandler = spy;
     window.addEventListener('scroll', spy, { passive:true });
     spy();
   }
@@ -981,9 +992,40 @@ function initChrome(){
 
   // Mobile drawer
   const drawer = $('#mobile-drawer');
-  $('#burger-btn')?.addEventListener('click', () => drawer.classList.add('open'));
-  drawer?.addEventListener('click', (e) => { if(e.target===drawer || e.target.classList.contains('scrim')) drawer.classList.remove('open'); });
-  $$('#mobile-drawer a').forEach(a => a.addEventListener('click', () => drawer.classList.remove('open')));
+  const burger = $('#burger-btn');
+  const closeDrawer = () => {
+    drawer.classList.remove('open');
+    burger?.setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('drawer-open');
+    burger?.focus();
+  };
+  burger?.addEventListener('click', () => {
+    drawer.classList.add('open');
+    burger.setAttribute('aria-expanded', 'true');
+    document.body.classList.add('drawer-open');
+    $('#drawer-close')?.focus();
+  });
+  $('#drawer-close')?.addEventListener('click', closeDrawer);
+  drawer?.addEventListener('click', (e) => { if(e.target===drawer || e.target.classList.contains('scrim')) closeDrawer(); });
+  $$('#mobile-drawer a').forEach(a => a.addEventListener('click', closeDrawer));
+  document.addEventListener('keydown', e => {
+    if(!drawer?.classList.contains('open')) return;
+    if(e.key === 'Escape') closeDrawer();
+    if(e.key === 'Tab') {
+      const focusable = $$('button, a, input', drawer);
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if(e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+      else if(!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
+    }
+  });
+  const mobileSearch = $('#mobile-search-input');
+  mobileSearch?.addEventListener('keydown', e => {
+    if(e.key === 'Enter' && mobileSearch.value.trim()){
+      location.hash = `#/search?q=${encodeURIComponent(mobileSearch.value.trim())}`;
+      closeDrawer();
+    }
+  });
 
   // Scroll to top button + navbar shrink shadow
   const scrollBtn = $('#scroll-top');
@@ -994,6 +1036,240 @@ function initChrome(){
 
   window.addEventListener('hashchange', navigate);
   navigate();
+
+  // Initialize Supabase Realtime & Test Control Widget
+  initSupabaseRealtime();
+  renderRealtimeControlWidget();
 }
 
+/* ============================================================
+   SUPABASE REALTIME ENGINE & TEST CONTROL PANEL
+   ============================================================ */
+const SUPABASE_URL = "https://yomwiagtsmecfefaqiwj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvbXdpYWd0c21lY2ZlZmFxaXdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MzY5NjUsImV4cCI6MjEwMjExMjk2NX0.5hZtNpB5q5ApJ1GLcB3GbOupkOqBoOZrpVcP2S5Rd9A";
+
+let supabaseClient = null;
+let currentStats = {
+  articles: DATA.site.stats.articles,
+  weekly_readers: DATA.site.stats.weekly_visitors,
+  active_codes: DATA.site.stats.codes,
+  contributors: DATA.site.stats.contributors
+};
+
+function initSupabaseRealtime() {
+  if (typeof window.supabase === 'undefined') return;
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Fetch initial stats from Supabase
+  supabaseClient
+    .from('site_stats')
+    .select('*')
+    .eq('id', 'main')
+    .single()
+    .then(({ data, error }) => {
+      if (!error && data) {
+        updateStatsFromPayload(data, false);
+      }
+    });
+
+  // Subscribe to Realtime channel
+  supabaseClient
+    .channel('public:site_stats')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'site_stats' }, payload => {
+      if (payload.new) {
+        updateStatsFromPayload(payload.new, true);
+      }
+    })
+    .subscribe(status => {
+      updateRealtimeStatusIndicator(status);
+    });
+}
+
+function updateRealtimeStatusIndicator(status) {
+  const badge = $('#rt-status-badge');
+  const dot = $('#rt-indicator-dot');
+  if (!badge || !dot) return;
+
+  if (status === 'SUBSCRIBED') {
+    badge.textContent = 'CONNECTED';
+    badge.style.background = 'rgba(16, 185, 129, 0.15)';
+    badge.style.color = '#10b981';
+    dot.className = 'rt-indicator';
+  } else if (status === 'TIMED_OUT' || status === 'CLOSED') {
+    badge.textContent = 'DISCONNECTED';
+    badge.style.background = 'rgba(239, 68, 68, 0.15)';
+    badge.style.color = '#ef4444';
+    dot.className = 'rt-indicator disconnected';
+  } else {
+    badge.textContent = 'CONNECTING...';
+    badge.style.background = 'rgba(245, 158, 11, 0.15)';
+    badge.style.color = '#f59e0b';
+    dot.className = 'rt-indicator connecting';
+  }
+}
+
+function updateStatsFromPayload(data, animate = true) {
+  if (data.articles !== undefined) currentStats.articles = data.articles;
+  if (data.weekly_readers !== undefined) currentStats.weekly_readers = data.weekly_readers;
+  if (data.active_codes !== undefined) currentStats.active_codes = data.active_codes;
+  if (data.contributors !== undefined) currentStats.contributors = data.contributors;
+
+  DATA.site.stats.articles = currentStats.articles;
+  DATA.site.stats.weekly_visitors = currentStats.weekly_readers;
+  DATA.site.stats.codes = currentStats.active_codes;
+  DATA.site.stats.contributors = currentStats.contributors;
+
+  updateHeroStatsDOM(animate);
+  updateControlPanelValues();
+}
+
+function updateHeroStatsDOM(animate = true) {
+  const map = {
+    'stat-articles': currentStats.articles,
+    'stat-weekly-readers': currentStats.weekly_readers,
+    'stat-codes': currentStats.active_codes,
+    'stat-contributors': currentStats.contributors
+  };
+
+  Object.entries(map).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (el) {
+      if (el.textContent !== String(val)) {
+        el.textContent = val;
+        if (animate) {
+          el.classList.remove('stat-updated');
+          void el.offsetWidth;
+          el.classList.add('stat-updated');
+        }
+      }
+    }
+  });
+}
+
+function updateControlPanelValues() {
+  const elArt = $('#rt-val-articles');
+  const elRead = $('#rt-val-readers');
+  const elCodes = $('#rt-val-codes');
+  const elContrib = $('#rt-val-contributors');
+
+  if (elArt) elArt.textContent = currentStats.articles;
+  if (elRead) elRead.textContent = currentStats.weekly_readers;
+  if (elCodes) elCodes.textContent = currentStats.active_codes;
+  if (elContrib) elContrib.textContent = currentStats.contributors;
+}
+
+function renderRealtimeControlWidget() {
+  if ($('#rt-widget-container')) return;
+
+  const container = document.createElement('div');
+  container.id = 'rt-widget-container';
+  container.innerHTML = `
+    <button class="rt-panel-toggle" id="rt-toggle-btn" title="Toggle Realtime Test Control">
+      <span class="rt-indicator" id="rt-indicator-dot"></span>
+      <span>Realtime Test</span>
+    </button>
+    <div class="rt-panel" id="rt-panel-box">
+      <div class="rt-panel-header">
+        <h4>⚡ Supabase Realtime</h4>
+        <span class="rt-status-badge" id="rt-status-badge">CONNECTING...</span>
+      </div>
+      <div class="rt-control-group">
+        <div class="rt-control-row">
+          <span class="rt-control-label">Articles</span>
+          <div class="rt-control-btns">
+            <button class="rt-btn-step" onclick="changeStat('articles', -1)">-</button>
+            <span class="rt-val" id="rt-val-articles">${currentStats.articles}</span>
+            <button class="rt-btn-step" onclick="changeStat('articles', 1)">+</button>
+          </div>
+        </div>
+        <div class="rt-control-row">
+          <span class="rt-control-label">Weekly Readers</span>
+          <div class="rt-control-btns">
+            <button class="rt-btn-step" onclick="changeStat('weekly_readers', -1)">-</button>
+            <span class="rt-val" id="rt-val-readers">${currentStats.weekly_readers}</span>
+            <button class="rt-btn-step" onclick="changeStat('weekly_readers', 1)">+</button>
+          </div>
+        </div>
+        <div class="rt-control-row">
+          <span class="rt-control-label">Active Codes</span>
+          <div class="rt-control-btns">
+            <button class="rt-btn-step" onclick="changeStat('active_codes', -1)">-</button>
+            <span class="rt-val" id="rt-val-codes">${currentStats.active_codes}</span>
+            <button class="rt-btn-step" onclick="changeStat('active_codes', 1)">+</button>
+          </div>
+        </div>
+        <div class="rt-control-row">
+          <span class="rt-control-label">Contributors</span>
+          <div class="rt-control-btns">
+            <button class="rt-btn-step" onclick="changeStat('contributors', -5)">-</button>
+            <span class="rt-val" id="rt-val-contributors">${currentStats.contributors}</span>
+            <button class="rt-btn-step" onclick="changeStat('contributors', 5)">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="rt-actions">
+        <button class="rt-action-btn btn-primary-alt" onclick="randomizeStats()">🎲 Randomize</button>
+        <button class="rt-action-btn" onclick="resetStats()">↺ Reset</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(container);
+
+  $('#rt-toggle-btn').addEventListener('click', () => {
+    $('#rt-panel-box').classList.toggle('open');
+  });
+}
+
+window.changeStat = async function(key, delta) {
+  if (!supabaseClient) return;
+  const newVal = Math.max(0, (currentStats[key] || 0) + delta);
+  const payload = { [key]: newVal, updated_at: new Date().toISOString() };
+
+  const { error } = await supabaseClient
+    .from('site_stats')
+    .update(payload)
+    .eq('id', 'main');
+
+  if (error) {
+    toast('Supabase error: ' + error.message);
+  }
+};
+
+window.randomizeStats = async function() {
+  if (!supabaseClient) return;
+  const payload = {
+    articles: Math.floor(Math.random() * 50) + 10,
+    weekly_readers: Math.floor(Math.random() * 200) + 50,
+    active_codes: Math.floor(Math.random() * 20) + 2,
+    contributors: Math.floor(Math.random() * 500) + 80,
+    updated_at: new Date().toISOString()
+  };
+
+  const { error } = await supabaseClient
+    .from('site_stats')
+    .update(payload)
+    .eq('id', 'main');
+
+  if (error) toast('Supabase error: ' + error.message);
+};
+
+window.resetStats = async function() {
+  if (!supabaseClient) return;
+  const payload = {
+    articles: 12,
+    weekly_readers: 10,
+    active_codes: 5,
+    contributors: 100,
+    updated_at: new Date().toISOString()
+  };
+
+  const { error } = await supabaseClient
+    .from('site_stats')
+    .update(payload)
+    .eq('id', 'main');
+
+  if (error) toast('Supabase error: ' + error.message);
+};
+
 document.addEventListener('DOMContentLoaded', initChrome);
+
